@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **The routing demo names its use case.** Its requests, in the UI and in the demo smoke test, send
+  `"use_case": "routing"` (D1A jonpol01/d1a#214). A D1A model with a routing temperature (`use_case_temperatures` in
+  `/v1/models`) answers them at that temperature, and the choice never moves. A model without one, or a D1A server older
+  than #214, answers exactly as before. Every other demo sends no use case.
 - **Pull-request checks:** a `verified commits` workflow (every commit signed; no AI attribution in the commits or the
   pull request body), and in the `scripts` job: `mini.sh`, `demo.sh` and `demo.ps1` must pin the same D1A commit, and no
   added line may hold a local machine path (`scripts/check_hygiene.py`, the same patterns as d1a's `d1a/core/hygiene.py`).
