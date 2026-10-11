@@ -55,6 +55,23 @@ class Outcomes(unittest.TestCase):
         self.assertNotIn("human", decide(1, edited))      # after the next call: that edit is about a later head
 
 
+    def test_severity_is_the_reviewers_only_from_the_review_that_decides_it(self):
+        # the same timeline after the review bot started deciding P0-P4 (SEV_REVIEWED_SINCE): a P that stands through its
+        # review is its agreement, a P it swaps in is its answer; before that date (the tests above) severity gets none
+        later = lambda s: s.replace("2026-10-05", "2026-10-12")
+        events = [{**e, "created_at": later(e["created_at"])} for e in EVENTS]
+        reviews = [{**r, "submitted_at": later(r["submitted_at"])} for r in REVIEWS]
+        calls = [later(c[0]) for c in CALLS]
+        def at(i, evs):
+            nxt = calls[i + 1] if i + 1 < len(calls) else None
+            return dict(outcomes({"ts": calls[i], "head_sha": CALLS[i][1], "applied_labels": D1A}, nxt, evs, reviews, calls))
+        self.assertEqual(at(2, events)["reviewer"]["sev"], "P3")
+        swapped = events + [{"event": "unlabeled", "label": "P3", "actor": BOT, "created_at": "2026-10-12T12:26:40Z"},
+                            {"event": "labeled", "label": "P2", "actor": BOT, "created_at": "2026-10-12T12:26:41Z"}]
+        self.assertEqual(at(2, swapped)["reviewer"]["sev"], "P2")
+        self.assertNotIn("sev", decide(2)["reviewer"])
+
+
 class Posting(unittest.TestCase):
     def test_each_outcome_is_posted_with_its_pr_as_the_group(self):
         """d1a.learning.feedback promote bootstraps over groups: every outcome of one PR carries group "<repo>#<number>"."""

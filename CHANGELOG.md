@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Severity gets a reviewer outcome.** Since 2026-10-11 04:49 JST the review bot decides P0-P4 in the same review
+  pass as type and blast radius (no extra model call) and swaps the P-label when it disagrees. `scripts/pr_outcomes.py`
+  reads it as the reviewer's grade of D1A's severity for reviews from that time only (`SEV_REVIEWED_SINCE`), so a P that
+  merely stood through an older review is never taken as the reviewer's answer.
 - **D1A pinned to `71d1bb81`** (d1a 0.4.0 + d1a#240, self-learning v2: the settings file, replay across versions, the
   data-triggered gate, `--show-config`); the served model stays D1A-E4B v0.6.
 
