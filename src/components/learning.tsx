@@ -89,7 +89,8 @@ export function Learning() {
       {data.corrections && (
         <section className="space-y-2 rounded-lg border border-border p-4 text-[13px]" data-testid="learning-corrections">
           <h2 className="font-medium">How often D1A&apos;s labels are changed</h2>
-          <p className="text-muted-foreground">Over the PR labeler&apos;s decisions whose window has closed (the next call came over a day ago), as of {data.corrections.ts.slice(0, 16).replace("T", " ")} UTC.
+          <p className="text-muted-foreground">Over the PR labeler&apos;s decisions, as of {data.corrections.ts.slice(0, 16).replace("T", " ")} UTC. A review bot grade counts as soon as it is posted;
+            a person&apos;s change counts once the decision is closed (the next call came over a day ago, or the PR&apos;s last call is over 14 days old).
             A change is a correction. Nobody changing a label is not proof it was right, so read the counts with the rates.</p>
           <table className="w-full text-left">
             <thead className="text-muted-foreground"><tr><th className="font-normal">Label</th><th className="font-normal">Closed</th><th className="font-normal">Review bot changed</th><th className="font-normal">A person changed</th></tr></thead>
@@ -162,6 +163,9 @@ function Shell({ children }: { children: React.ReactNode }) {
         <p className="text-[13px] leading-5 text-muted-foreground">
           How D1A learns from the labels its PR decisions get: which outcomes count, when the promotion gate runs, and what it decided.
           A calibrator is promoted only when it is clearly better on pull requests it was not fitted on.
+          At today&apos;s outcome volume the gate can only detect a gain about ten times larger than recalibration usually brings
+          (around 0.02 in log loss), so &ldquo;nothing promoted&rdquo; is the expected result until the next model: between models the loop
+          works as drift monitoring.
         </p>
       </header>
       {children}

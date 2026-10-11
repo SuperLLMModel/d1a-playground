@@ -87,6 +87,21 @@ class Summary(unittest.TestCase):
         self.assertEqual(s["type"], {"closed": 2, "reviewed": 2, "reviewer_changed": 0, "person_changed": 0})
         self.assertEqual(s["sev"], {"closed": 2, "reviewed": 1, "reviewer_changed": 0, "person_changed": 1})   # a: no reviewer sev (before the cutover)
 
+    def test_a_prs_last_call_counts_its_review_at_once_and_a_persons_change_once_checking_stops(self):
+        """Most PRs get one labeler call: its review bot grade counts as soon as it is posted, and a person's change once
+        the call is older than --days (14), when nothing more is checked; before that it is still open."""
+        now = datetime(2026, 10, 12, tzinfo=timezone.utc)
+        calls = [{"ts": "2026-10-11T00:00:00Z", "repo": "o/r", "number": 2, "decision_id": "d", "applied_labels": D1A},
+                 {"ts": "2026-09-20T00:00:00Z", "repo": "o/r", "number": 3, "decision_id": "e", "applied_labels": D1A},
+                 {"ts": "2026-10-10T00:00:00Z", "repo": "o/r", "number": 4, "decision_id": "f", "applied_labels": D1A}]
+        posted = {"d": {"reviewer": {"type": "type/bug", "blast": "review:blast-contained", "sev": "P2"}},   # one call, graded
+                  "e": {"human": {"sev": "P0"}},                                                             # checked to the end
+                  "f": {"human": {"sev": "P1"}}}                                                             # still checked
+        s = pr_outcomes.summary(calls, posted, now)
+        self.assertEqual(s["type"], {"closed": 1, "reviewed": 1, "reviewer_changed": 1, "person_changed": 0})
+        self.assertEqual(s["blast"], {"closed": 1, "reviewed": 1, "reviewer_changed": 0, "person_changed": 0})
+        self.assertEqual(s["sev"], {"closed": 1, "reviewed": 1, "reviewer_changed": 1, "person_changed": 1})
+
 
 class Posting(unittest.TestCase):
     def test_each_outcome_is_posted_with_its_pr_as_the_group(self):
