@@ -12,8 +12,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **How often D1A's labels are changed** counted only decisions followed by a later labeler call on the same PR, so it
+  missed every PR's last call: about two thirds of the review bot's grades (on the Mini, 44 of 154 type grades and 0 of 15
+  severity grades were shown). A review bot grade now counts as soon as it is posted; a person's change counts once the
+  decision is closed (the next call came over a day ago, or the PR's last call is older than `--days`, when the script
+  stops checking it). `summary()` has a test for a PR with one call, red before this fix.
+
 ### Changed
 
+- **The Learning page says what to expect from the gate.** At today's outcome volume it can only detect a gain about ten
+  times larger than recalibration usually brings (around 0.02 in log loss, measured offline on 437 fresh PRs), so "nothing
+  promoted" is the expected result until the next model; between models the loop works as drift monitoring. The Fable
+  adviser's assessment, 2026-10-11.
 - **D1A pinned to `2007cb17`**: the learned-flags serving (d1a#242, no flag configured), the 0.3 module-path shims removed and
   new runs saved without head.pt (d1a#243), and the fix for the Metal abort on overlapping media requests (d1a#245).
 - **Severity gets a reviewer outcome.** Since 2026-10-11 04:49 JST the review bot decides P0-P4 in the same review
