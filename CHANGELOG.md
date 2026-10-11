@@ -12,6 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **D1A pinned to `5f771e17`** (d1a 0.5.0, plus d1a#248 and d1a#251): `feedback void` withdraws one source's outcomes with a reason
+  without rewriting the log, and `outcomes.sources` can name sources per question. After this deploy, the 40 PR-author
+  "human" outcomes are voided, and the review bot's severity becomes monitoring-only
+  (`{"sev": ["human"], "*": ["reviewer", "human"]}`, jonpol01/d1a#252). The served model stays D1A-E4B v0.6.
+
 ### Fixed
 
 - **A PR's author labelling it while opening it is no longer a "human" outcome.** Agent sessions open most PRs on John's
