@@ -14,6 +14,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **D1A pinned to `2007cb17`**: the learned-flags serving (d1a#242, no flag configured), the 0.3 module-path shims removed and
+  new runs saved without head.pt (d1a#243), and the fix for the Metal abort on overlapping media requests (d1a#245).
 - **Severity gets a reviewer outcome.** Since 2026-10-11 04:49 JST the review bot decides P0-P4 in the same review
   pass as type and blast radius (no extra model call) and swaps the P-label when it disagrees. `scripts/pr_outcomes.py`
   reads it as the reviewer's grade of D1A's severity for reviews from that time only (`SEV_REVIEWED_SINCE`), so a P that
