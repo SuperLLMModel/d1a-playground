@@ -14,6 +14,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **A PR's author labelling it while opening it is no longer a "human" outcome.** Agent sessions open most PRs on John's
+  repositories under his account and label them in the same minute (`gh pr create --label`, or `gh pr edit` just after),
+  so `scripts/pr_outcomes.py` read those labels as a person correcting D1A, ranked above the review bot: 40 such outcomes
+  sit in the live log (1 on 10-05, 39 from one early run on 10-06), and no person has corrected D1A yet. The author's
+  label events until 10 minutes after the first labeler call (`AUTHOR_LEAD`) no longer count; the author changing a label
+  later, and any other person at any time, still do. The PR's or issue's author is read with one more API call per poll.
+  The 40 records already logged are voided in D1A (d1a `feedback void`).
 - **How often D1A's labels are changed** counted only decisions followed by a later labeler call on the same PR, so it
   missed every PR's last call: about two thirds of the review bot's grades (on the Mini, 44 of 154 type grades and 0 of 15
   severity grades were shown). A review bot grade now counts as soon as it is posted; a person's change counts once the

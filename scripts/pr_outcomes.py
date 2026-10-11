@@ -11,7 +11,8 @@ follow on GitHub:
   labels. Its type/* and review:blast-* labels after its review of the decision's head are that decision's outcome. It
   decides P0-P4 the same way, in the same pass, for reviews from SEV_REVIEWED_SINCE (2026-10-11 04:49 JST); before that
   its reviews give severity no outcome.
-- human: a person (any account that is not a bot) changing a type, blast-radius or severity label after the decision.
+- human: a person (any account that is not a bot) changing a type, blast-radius or severity label after the decision;
+  the PR's or issue's own author until AUTHOR_LEAD after the first labeler call is not one (an agent session opening it).
   d1a.learning.feedback ranks these above the reviewer's, whatever arrives last.
 A decision's window closes at the next labeler call on the same pull request (a new head), so a later head's labels are
 never counted against it. Nothing is written to GitHub. Posted outcomes are remembered in --state, so each is sent once.
@@ -48,6 +49,7 @@ REVIEWER = "hermes-prbot[bot]"
 SETTLE = timedelta(minutes=2)        # the review bot sets its labels within seconds of posting its review
 REVIEW_LEAD = timedelta(minutes=10)  # ... or while writing it
 CALL_LEAD = timedelta(seconds=20)    # the labeler writes its labels in the seconds before it logs the call
+AUTHOR_LEAD = timedelta(minutes=10)  # the author's labels until this long after the first call were set while opening it, not a correction
 RUN = timedelta(minutes=15)          # mini.sh runs this every 15 minutes
 BACKOFF = ((timedelta(days=1), 1), (timedelta(days=3), 4))   # (decision younger than, poll every Nth run); older: OLD_EVERY
 OLD_EVERY = 24
@@ -78,7 +80,7 @@ def family_labels(labels, families):
     return out
 
 
-def outcomes(decision, next_ts, events, reviews, call_times=()):
+def outcomes(decision, next_ts, events, reviews, call_times=(), author=None):
     """[(src, {question: label})] for one decision, given its pull request's label events ({event, label, actor,
     created_at}), reviews ({user, commit_id, submitted_at}) and the times of all labeler calls on it. Empty while the
     reviewer has not reviewed the decision's head and no person has touched its labels.
@@ -90,6 +92,7 @@ def outcomes(decision, next_ts, events, reviews, call_times=()):
     from an earlier head."""
     t0 = ts(decision["ts"]); end = ts(next_ts) if next_ts else None
     calls = [ts(t) for t in call_times]
+    opened = min(calls, default=t0) + AUTHOR_LEAD   # PRs and issues opened by an agent session get their labels in the same minute
     out = []
     review = min((r for r in reviews if r["user"] == REVIEWER and r["commit_id"] == decision["head_sha"] and r.get("submitted_at")),
                  key=lambda r: r["submitted_at"], default=None)
@@ -105,6 +108,7 @@ def outcomes(decision, next_ts, events, reviews, call_times=()):
             elif q in standing: got[q] = standing[q]
         if got: out.append(("reviewer", got))
     human = [e for e in events if not e["actor"].endswith("[bot]") and t0 < ts(e["created_at"]) and (end is None or ts(e["created_at"]) < end)
+             and not (author and e["actor"] == author and ts(e["created_at"]) <= opened)   # by itself, not by t0: the order may vary
              and any(f(e["label"]) for f in FAMILIES.values())]
     if human:
         touched = [q for q in FAMILIES if any(FAMILIES[q](e["label"]) for e in human)]
@@ -128,11 +132,13 @@ def label_events(repo, number):
 def pr_history(repo, number):
     reviews = [{"user": (r.get("user") or {}).get("login", ""), "commit_id": r.get("commit_id"), "submitted_at": r.get("submitted_at")}
                for r in gh(f"repos/{repo}/pulls/{number}/reviews?per_page=100")]
-    return label_events(repo, number), reviews
+    author = gh(f"repos/{repo}/pulls/{number}", ".user.login")
+    return label_events(repo, number), reviews, author[0] if author else None
 
 
 def issue_history(repo, number):
-    return label_events(repo, number), []
+    author = gh(f"repos/{repo}/issues/{number}", ".user.login")
+    return label_events(repo, number), [], author[0] if author else None
 
 
 def issue_calls(log_path):
@@ -254,12 +260,12 @@ def main(argv=None, now=None):
         todo = [(c, next_ts) for c, next_ts in todo if c.get("decision_id") and ts(c["ts"]) >= since
                 and wanted(c, next_ts, posted.get(c["decision_id"], {}), now, srcs)]
         if not any(due(c, now, f"{repo}#{number}") for c, _ in todo): continue
-        try: events, reviews = history(repo, number)
+        try: events, reviews, author = history(repo, number)
         except (RuntimeError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
             print(f"skip {repo}#{number}: {e}", file=sys.stderr); continue
         for c, next_ts in todo:
             done = posted.setdefault(c["decision_id"], {})
-            for src, labels in outcomes(c, next_ts, events, reviews, [x["ts"] for x in seq]):
+            for src, labels in outcomes(c, next_ts, events, reviews, [x["ts"] for x in seq], author):
                 if done.get(src) == labels: continue
                 print(f"{repo}#{number} {(c['head_sha'] or 'issue')[:8]} {src}: {labels}")
                 if not a.dry_run:
