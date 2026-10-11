@@ -23,6 +23,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **How often D1A's labels are changed** (the Learning page): per label family, over the PR labeler's decisions whose
+  window has closed, how many the review bot graded and changed and how many a person changed. `scripts/pr_outcomes.py`
+  writes it to `.demo/feedback/outcomes-summary.json` each run; nothing new is posted to D1A. Shown with the counts,
+  since nobody changing a label is not proof it was right (the Fable adviser's monitor, d1a-playground#45).
 - **The Learning page** (`/learning`, d1a#233): the self-learning settings with an edit form (validated by D1A; a value
   out of range is refused), each question's outcomes and how many it still needs, the last runs of the loop with the
   smallest log-loss gain each gate could detect, and every settings change.

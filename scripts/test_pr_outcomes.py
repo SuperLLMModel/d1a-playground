@@ -72,6 +72,22 @@ class Outcomes(unittest.TestCase):
         self.assertNotIn("sev", decide(2)["reviewer"])
 
 
+class Summary(unittest.TestCase):
+    def test_changes_are_counted_per_family_over_closed_windows_only(self):
+        now = datetime(2026, 10, 12, tzinfo=timezone.utc)
+        calls = [{"ts": "2026-10-05T11:50:13Z", "repo": "o/r", "number": 1, "decision_id": "a", "applied_labels": D1A},
+                 {"ts": "2026-10-05T12:00:17Z", "repo": "o/r", "number": 1, "decision_id": "b", "applied_labels": D1A},
+                 {"ts": "2026-10-09T00:00:00Z", "repo": "o/r", "number": 1, "decision_id": "c", "applied_labels": D1A}]
+        posted = {"a": {"reviewer": {"type": "type/refactor", "blast": "review:blast-broad"}},      # blast changed
+                  "b": {"reviewer": {"type": "type/refactor", "blast": "review:blast-contained", "sev": "P3"},
+                        "human": {"sev": "P1"}},                                                  # a person changed sev
+                  "c": {"human": {"sev": "P0"}}}                                                  # no next call: still open
+        s = pr_outcomes.summary(calls, posted, now)
+        self.assertEqual(s["blast"], {"closed": 2, "reviewed": 2, "reviewer_changed": 1, "person_changed": 0})
+        self.assertEqual(s["type"], {"closed": 2, "reviewed": 2, "reviewer_changed": 0, "person_changed": 0})
+        self.assertEqual(s["sev"], {"closed": 2, "reviewed": 1, "reviewer_changed": 0, "person_changed": 1})   # a: no reviewer sev (before the cutover)
+
+
 class Posting(unittest.TestCase):
     def test_each_outcome_is_posted_with_its_pr_as_the_group(self):
         """d1a.learning.feedback promote bootstraps over groups: every outcome of one PR carries group "<repo>#<number>"."""

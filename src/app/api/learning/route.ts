@@ -36,11 +36,13 @@ const off = () => Response.json({ error: "the Learning page is off: mini.sh pass
 
 export async function GET() {
   if (!FILE) return off();
-  const [shown, status, changes] = await Promise.all([config(["show"]), STATUS ? readJson(STATUS) : null, audit()]);
+  const corrections = STATUS ? `${STATUS.replace(/[^/]*$/, "")}outcomes-summary.json` : "";   // written by scripts/pr_outcomes.py beside the status
+  const [shown, status, changes, changed] = await Promise.all([config(["show"]), STATUS ? readJson(STATUS) : null, audit(),
+    corrections ? readJson(corrections) : null]);
   if (!shown.ok) return Response.json({ error: `config show: ${shown.err}` }, { status: 500 });
   const reports = (status?.reports ?? []).slice(-15).reverse().map(summarize);
   return Response.json({
-    ...parseShow(shown.out), changes, logging: LOGGING,
+    ...parseShow(shown.out), changes, logging: LOGGING, corrections: changed,
     status: status && { run: status.run, last_gate: status.last_gate, per_question: status.per_question ?? {}, replay_complete: status.replay_complete, reports },
   });
 }

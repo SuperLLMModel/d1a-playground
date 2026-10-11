@@ -8,7 +8,8 @@ type Settings = Record<string, Record<string, unknown>>;
 type Report = { ts: number; model_change?: { from: string | null; to: string }; settings_error?: string; server?: string; reached_min?: string[];
   replay?: { replayed?: number; left?: number; excluded?: Record<string, number>; refused?: string; paused?: boolean; error?: string };
   gate?: { reason?: string; skipped?: string; outcomes?: number; replayed?: number; promoted?: string[]; written?: boolean; auto?: boolean; power?: string } };
-type State = { source: string; error: string | null; settings: Settings | null; logging: boolean;
+type Corrections = { ts: string; families: Record<string, { closed: number; reviewed: number; reviewer_changed: number; person_changed: number }> };
+type State = { source: string; error: string | null; settings: Settings | null; logging: boolean; corrections?: Corrections | null;
   changes: { ts: number; key: string; old: unknown; new: unknown; source: string }[];
   status: { run?: string; last_gate?: number; replay_complete?: boolean; per_question: Record<string, { outcomes: number; fit: number; needs: number }>; reports: Report[] } | null };
 
@@ -84,6 +85,20 @@ export function Learning() {
           </table>
         ) : <p className="text-muted-foreground">No outcomes for the served model yet.</p>}
       </section>
+
+      {data.corrections && (
+        <section className="space-y-2 rounded-lg border border-border p-4 text-[13px]" data-testid="learning-corrections">
+          <h2 className="font-medium">How often D1A&apos;s labels are changed</h2>
+          <p className="text-muted-foreground">Over the PR labeler&apos;s decisions whose window has closed (the next call came over a day ago), as of {data.corrections.ts.slice(0, 16).replace("T", " ")} UTC.
+            A change is a correction. Nobody changing a label is not proof it was right, so read the counts with the rates.</p>
+          <table className="w-full text-left">
+            <thead className="text-muted-foreground"><tr><th className="font-normal">Label</th><th className="font-normal">Closed</th><th className="font-normal">Review bot changed</th><th className="font-normal">A person changed</th></tr></thead>
+            <tbody>{Object.entries(data.corrections.families).map(([q, v]) => <tr key={q}><td className="font-mono">{q}</td><td>{v.closed}</td>
+              <td>{v.reviewed ? `${v.reviewer_changed} of ${v.reviewed} reviewed (${Math.round((100 * v.reviewer_changed) / v.reviewed)}%)` : "not reviewed"}</td>
+              <td>{v.person_changed} of {v.closed}</td></tr>)}</tbody>
+          </table>
+        </section>
+      )}
 
       <section className="space-y-2 rounded-lg border border-border p-4 text-[13px]">
         <h2 className="font-medium">Settings</h2>

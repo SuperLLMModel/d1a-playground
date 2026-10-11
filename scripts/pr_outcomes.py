@@ -195,6 +195,27 @@ def outcomes_enabled(path):
     return True
 
 
+def summary(calls, posted, now):
+    """How often D1A's labels were changed, per family, over the PR labeler's decisions (for the Learning page): decisions
+    the reviewer graded and how many of those it changed, and how many a person changed, among decisions whose window is
+    closed (the next call on the PR came over CLOSED ago). A rate with nobody looking says nothing, so the counts go with it."""
+    by_pr = {}
+    for c in sorted(calls, key=lambda c: c["ts"]): by_pr.setdefault((c["repo"], c["number"]), []).append(c)
+    out = {q: {"closed": 0, "reviewed": 0, "reviewer_changed": 0, "person_changed": 0} for q in FAMILIES}
+    for seq in by_pr.values():
+        for i, c in enumerate(seq):
+            if i + 1 >= len(seq) or now - ts(seq[i + 1]["ts"]) <= CLOSED or not c.get("decision_id"): continue
+            mine = family_labels(set(c.get("applied_labels") or ()), FAMILIES)
+            got = posted.get(c["decision_id"], {})
+            for q in FAMILIES:
+                if q not in mine: continue
+                s = out[q]; s["closed"] += 1
+                if q in got.get("reviewer", {}):
+                    s["reviewed"] += 1; s["reviewer_changed"] += got["reviewer"][q] != mine[q]
+                if q in got.get("human", {}) and got["human"][q] != mine[q]: s["person_changed"] += 1
+    return out
+
+
 def main(argv=None, now=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--decisions", default="/Users/Shared/d1a/labeler-decisions.jsonl")
@@ -243,6 +264,7 @@ def main(argv=None, now=None):
                     done[src] = labels; sent += 1
     if not a.dry_run:
         state_path.parent.mkdir(parents=True, exist_ok=True); state_path.write_text(json.dumps(posted, indent=1) + "\n")
+        (state_path.parent / "outcomes-summary.json").write_text(json.dumps({"ts": now.isoformat(), "families": summary(calls, posted, now)}, indent=1) + "\n")
     print(f"{sent} outcomes posted")
     return 0
 
