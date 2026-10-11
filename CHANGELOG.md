@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Pull-request checks:** a `verified commits` workflow (every commit signed; no AI attribution in the commits or the
+  pull request body), and in the `scripts` job: `mini.sh`, `demo.sh` and `demo.ps1` must pin the same D1A commit, and no
+  added line may hold a local machine path (`scripts/check_hygiene.py`, the same patterns as d1a's `d1a/core/hygiene.py`).
+
 ### Changed
 
 - **D1A pinned to `5f771e17`** (d1a 0.5.0, plus d1a#248 and d1a#251): `feedback void` withdraws one source's outcomes with a reason
