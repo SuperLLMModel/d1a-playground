@@ -9,7 +9,8 @@ type, blast radius, severity P0-P4) and applies the answers as labels. It writes
 follow on GitHub:
 - reviewer: the review bot (another model) re-decides type and blast radius on every head it reviews and sets its own
   labels. Its type/* and review:blast-* labels after its review of the decision's head are that decision's outcome. It
-  never sets P0-P4, so severity gets no reviewer outcome.
+  decides P0-P4 the same way, in the same pass, for reviews from SEV_REVIEWED_SINCE (2026-10-11 04:49 JST); before that
+  its reviews give severity no outcome.
 - human: a person (any account that is not a bot) changing a type, blast-radius or severity label after the decision.
   d1a.learning.feedback ranks these above the reviewer's, whatever arrives last.
 A decision's window closes at the next labeler call on the same pull request (a new head), so a later head's labels are
@@ -40,6 +41,9 @@ from pathlib import Path
 FAMILIES = {"type": lambda l: l.startswith("type/"), "blast": lambda l: l.startswith("review:blast-"),
             "sev": lambda l: l in ("P0", "P1", "P2", "P3", "P4")}
 REVIEWER_FAMILIES = ("type", "blast")
+SEV_REVIEWED_SINCE = "2026-10-10T19:49:17Z"   # from this review on, the review bot also decides P0-P4 in the same pass
+                                              # (its github-pr-review skill, changed 2026-10-11 04:49 JST); before it, a P
+                                              # that stood through a review was only D1A's own, never the reviewer's answer
 REVIEWER = "hermes-prbot[bot]"
 SETTLE = timedelta(minutes=2)        # the review bot sets its labels within seconds of posting its review
 REVIEW_LEAD = timedelta(minutes=10)  # ... or while writing it
@@ -91,8 +95,9 @@ def outcomes(decision, next_ts, events, reviews, call_times=()):
                  key=lambda r: r["submitted_at"], default=None)
     if review is not None:
         tr = ts(review["submitted_at"]); lo, hi = max(t0, tr - REVIEW_LEAD), tr + SETTLE
-        got, standing = {}, family_labels(labels_at(events, hi), REVIEWER_FAMILIES)
-        for q in REVIEWER_FAMILIES:
+        families = REVIEWER_FAMILIES + (("sev",) if tr >= ts(SEV_REVIEWED_SINCE) else ())
+        got, standing = {}, family_labels(labels_at(events, hi), families)
+        for q in families:
             adds = [e for e in sorted(events, key=lambda e: e["created_at"]) if e["event"] == "labeled" and e["actor"] == REVIEWER
                     and FAMILIES[q](e["label"]) and lo <= ts(e["created_at"]) <= hi
                     and not any(c - CALL_LEAD <= ts(e["created_at"]) <= c + timedelta(seconds=2) for c in calls)]
