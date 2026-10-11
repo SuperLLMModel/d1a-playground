@@ -72,6 +72,22 @@ class Outcomes(unittest.TestCase):
         self.assertNotIn("sev", decide(2)["reviewer"])
 
 
+class Author(unittest.TestCase):
+    def test_the_authors_own_labels_while_opening_the_pr_are_not_a_correction(self):
+        """jonpol01/d1a#151 (2026-10-05): an agent session opened the PR as its author and added its labels 13 s after the
+        labeler's call. Those are the author's labels, not a person correcting D1A; the same author changing one later is."""
+        call = {"ts": "2026-10-05T15:45:18Z", "head_sha": "b254c686", "applied_labels": D1A}
+        opening = [ev2("2026-10-05T15:45:31Z", "type/feature"), ev2("2026-10-05T15:45:31Z", "review:blast-contained"), ev2("2026-10-05T15:45:32Z", "P3")]
+        self.assertNotIn("human", dict(outcomes(call, None, opening, [], [call["ts"]], author=PERSON)))
+        later = opening + [{**ev2("2026-10-05T17:00:00Z", "P3"), "event": "unlabeled"}, ev2("2026-10-05T17:00:01Z", "P1")]
+        self.assertEqual(dict(outcomes(call, None, later, [], [call["ts"]], author=PERSON))["human"], {"sev": "P1"})
+        self.assertIn("human", dict(outcomes(call, None, opening, [], [call["ts"]], author="someone-else")))   # another person: counts
+
+
+def ev2(at, label, actor=PERSON):
+    return {"event": "labeled", "label": label, "actor": actor, "created_at": at}
+
+
 class Summary(unittest.TestCase):
     def test_changes_are_counted_per_family_over_closed_windows_only(self):
         now = datetime(2026, 10, 12, tzinfo=timezone.utc)
@@ -113,7 +129,7 @@ class Posting(unittest.TestCase):
                                              "decision_id": "d-1", "applied_labels": D1A}) + "\n", encoding="utf-8")
             sent = []
             fake_open = lambda req, timeout: (sent.append(json.loads(req.data)), mock.MagicMock(status=200, __enter__=lambda s: s, __exit__=lambda *a: None))[1]
-            with mock.patch.object(pr_outcomes, "pr_history", return_value=(EVENTS + [ev("12:30:00", "unlabeled", "P3", PERSON), ev("12:30:01", "labeled", "P1", PERSON)], REVIEWS)), \
+            with mock.patch.object(pr_outcomes, "pr_history", return_value=(EVENTS + [ev("12:30:00", "unlabeled", "P3", PERSON), ev("12:30:01", "labeled", "P1", PERSON)], REVIEWS, PERSON)), \
                  mock.patch("urllib.request.urlopen", fake_open):
                 self.assertEqual(pr_outcomes.main(["--decisions", str(decisions), "--state", str(Path(tmp) / "posted.json"), "--log", str(Path(tmp) / "none.jsonl")],
                                                   now=pr_outcomes.ts("2026-10-05T13:00:00Z")), 0)
@@ -152,7 +168,7 @@ class Issues(unittest.TestCase):
             sent = []
             fake_open = lambda req, timeout: (sent.append(json.loads(req.data)), mock.MagicMock(status=200, __enter__=lambda s: s, __exit__=lambda *a: None))[1]
             with mock.patch.object(pr_outcomes, "find_issues", return_value=found) as find, \
-                 mock.patch.object(pr_outcomes, "issue_history", return_value=(events, [])), \
+                 mock.patch.object(pr_outcomes, "issue_history", return_value=(events, [], "issue-author")), \
                  mock.patch.object(pr_outcomes, "pr_history", side_effect=AssertionError("no PR call to check")), \
                  mock.patch("urllib.request.urlopen", fake_open):
                 code = pr_outcomes.main(["--decisions", str(calls), "--log", str(log), "--state", str(Path(tmp) / "posted.json"), *args],
@@ -203,7 +219,7 @@ class Polling(unittest.TestCase):
             decisions, state = Path(tmp) / "calls.jsonl", Path(tmp) / "posted.json"
             decisions.write_text("".join(json.dumps(c) + "\n" for c in calls), encoding="utf-8")
             state.write_text(json.dumps(posted or {}))
-            with mock.patch.object(pr_outcomes, "pr_history", return_value=([], [])) as history, \
+            with mock.patch.object(pr_outcomes, "pr_history", return_value=([], [], None)) as history, \
                  mock.patch.object(pr_outcomes, "find_issues", side_effect=AssertionError("no issue calls")):
                 pr_outcomes.main(["--decisions", str(decisions), "--state", str(state), "--log", str(Path(tmp) / "none.jsonl"), "--dry-run"], now=now)
         return sorted(c.args[1] for c in history.call_args_list)
