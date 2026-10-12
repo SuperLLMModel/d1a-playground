@@ -38,6 +38,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the local-path check diffs a pull request against its base
+      # the checker comes from the base branch when it has one, so a pull request cannot loosen the check it is judged by
+      - name: One D1A pin across the launchers; no local machine path in a pull request's added lines
+        env:
+          BASE: ${{ github.base_ref || 'main' }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/trusted/scripts
+          if git show "origin/$BASE:scripts/check_hygiene.py" > /tmp/trusted/scripts/check_hygiene.py 2>/dev/null; then echo "the base branch's checker"
+          else echo "::notice::the base branch has no checker yet; using this pull request's copy"; cp scripts/check_hygiene.py /tmp/trusted/scripts/; fi
+          python3 - <<'PY'
+          import importlib.util, pathlib, sys
+          spec = importlib.util.spec_from_file_location("check_hygiene", "/tmp/trusted/scripts/check_hygiene.py")
+          m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+          p = m.pins(pathlib.Path.cwd())   # the launchers of this checkout, judged by the trusted checker
+          ok = None not in p.values() and len(set(p.values())) == 1
+          print(f"D1A pinned to {next(iter(p.values()))} everywhere" if ok else f"::error::the D1A pin differs between launchers: {p}")
+          sys.exit(0 if ok else 1)
+          PY
+          if [ "$EVENT" = pull_request ]; then git diff -U0 "origin/$BASE...HEAD" | python3 /tmp/trusted/scripts/check_hygiene.py paths; fi
       - run: bash -n demo.sh && bash -n mini.sh
       - name: demo.ps1 parses (PowerShell)
         shell: pwsh
@@ -47,6 +69,7 @@ jobs:
           if ($errors) { $errors | ForEach-Object { "demo.ps1:$($_.Extent.StartLineNumber): $($_.Message)" }; exit 1 }
       - run: python3 -m py_compile server/lmstudio_systemone.py server/kev/api.py scripts/pr_outcomes.py
       - run: python3 -m unittest scripts/test_pr_outcomes.py
+      - run: python3 -m unittest scripts/test_check_hygiene.py
       - run: python3 scripts/release_notes.py --check "v$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
 
   mini-macos:
