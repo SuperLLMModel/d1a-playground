@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 # split so this file never holds one of the paths it looks for
 LOCAL_PATH = re.compile(r"/Users/(john|soliva)/" "|" r"/private/tmp/" r"claude-" "|" r"/Vol" r"umes/")
-ATTRIBUTION = re.compile(r"(?im)^\s*co-authored-by:.*\b(claude|anthropic)\b|generated with \[?claude code")
+ATTRIBUTION = re.compile(r"(?im)^\s*co-authored-by:.*\b(claude|anthropic)\b|^\W*generated with \[?claude code")   # line starts only: a sentence describing the rule is not attribution
 PINS = {"mini.sh": r'^D1A_SHA="([0-9a-f]{40})"', "demo.sh": r'^D1A_SHA="([0-9a-f]{40})"', "demo.ps1": r"^\$D1aSha = '([0-9a-f]{40})'"}
 
 

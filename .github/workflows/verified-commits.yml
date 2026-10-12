@@ -42,7 +42,7 @@ jobs:
           gh api --paginate "repos/$REPO/pulls/$PR/commits" --jq '.[].commit.message' > messages.txt
           [ -s messages.txt ] || { echo "::error::no commit messages listed for this pull request"; exit 1; }
           printf '%s\n' "$BODY" >> messages.txt
-          if grep -Ein '^[[:space:]]*co-authored-by:.*(claude|anthropic)|generated with \[?claude code' messages.txt; then
+          if grep -Ein '^[[:space:]]*co-authored-by:.*(claude|anthropic)|^[^[:alnum:]]*generated with \[?claude code' messages.txt; then
             echo "::error::commits and pull requests carry no AI attribution"
             exit 1
           fi

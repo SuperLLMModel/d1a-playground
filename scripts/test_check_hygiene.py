@@ -16,6 +16,8 @@ class Checks(unittest.TestCase):
     def test_attribution(self):
         self.assertTrue(H.attribution("x\n\nCo-Authored-By: Claude <noreply@anthropic.com>"))
         self.assertFalse(H.attribution("Co-Authored-By: Jane <jane@example.com>"))
+        self.assertTrue(H.attribution("x\n\n\U0001f916 Generated with [Claude Code](https://claude.com/claude-code)"))
+        self.assertFalse(H.attribution('no commit carries AI attribution ("Generated with Claude Code")'))
 
     def test_paths_only_added_and_ours(self):
         diff = "\n".join(["+++ b/a.md", "+in /Users/" + "john/x", "-in /private/tmp/" + "claude-1/y", "+/Users/" + "Shared/d1a/z"])
