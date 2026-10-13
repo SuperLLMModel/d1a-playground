@@ -251,6 +251,15 @@ labels() {   # the agents this machine runs, in start order
   return 0
 }
 
+wait_for_model() {   # the web app is ready in ~50 ms, the model server's port opens seconds later: until then every
+  # proxied request (the page's first /v1/models poll) is a 500 "ECONNREFUSED" (d1a#42). Bounded: a slow load still starts the web.
+  local n=0
+  until curl -fs -m 3 -o /dev/null "http://127.0.0.1:$KEV_PORT/v1/models"; do
+    n=$((n + 1)); [ $n -ge 60 ] && { say "the model server is not answering on :$KEV_PORT after 2 minutes; starting the web app anyway"; return 0; }
+    sleep 2
+  done
+}
+
 start() {
   local d; d="$(domain)"
   for l in $(labels); do
@@ -258,6 +267,7 @@ start() {
     launchctl bootstrap "$d" "$AGENTS/$l.plist"
     [ "$l" = "$PROMOTE_LABEL" ] && continue   # a calendar job: it runs at 04:00, not at start
     launchctl kickstart "$d/$l"   # a bootstrap right after a bootout can leave the agent loaded but not running
+    if [ "$l" = "$MODEL_LABEL" ]; then wait_for_model; fi
   done
   say "started; logs in $LOGS/d1a-model.log and $LOGS/d1a-web.log (the model takes a minute or two to load the first time)"
 }

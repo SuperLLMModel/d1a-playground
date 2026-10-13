@@ -31,6 +31,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **No more 500s while the model server starts** (jonpol01/d1a#42). `mini.sh` now starts the model server first and
+  waits, for up to 2 minutes, until it answers `/v1/models` before starting the web app. Until then the web app (ready
+  in about 50 ms) proxied the page's first models poll to a closed port and returned a 500 (`ECONNREFUSED`): once per
+  restart on the Mac mini, 13 of 21 restarts since 2026-10-03.
 - **A PR's author labelling it while opening it is no longer a "human" outcome.** Agent sessions open most PRs on John's
   repositories under his account and label them in the same minute (`gh pr create --label`, or `gh pr edit` just after),
   so `scripts/pr_outcomes.py` read those labels as a person correcting D1A, ranked above the review bot: 40 such outcomes
