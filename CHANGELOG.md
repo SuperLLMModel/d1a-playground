@@ -28,6 +28,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **The Mac mini serves D1A-E2B-it v0.6, one model for decisions and OpenAI chat** (jonpol01/d1a#274): an unmerged 8-bit
+  build of `JohnP1/d1a-e2b-it@v0.6` with the media encoders, built locally (not published), with `OPENAI_PORT=1234` and
+  `EMBED_GGUF` (nomic-embed-text-v1.5). LM Studio is off. mem0, n8n and the Hermes fallbacks reach D1A on port 1234. John
+  accepted the PR labeler's regression from E4B v0.6.1 (severity 72.9% vs 79.1% on 487 newer PRs, P0/P1 found 3 of 30 vs
+  13 of 30). Rollback: restore `.demo/mini.env.before-274` (`MODEL_RUN=JohnP1/d1a-e4b-mlx-q8@v0.6.1`, no `OPENAI_PORT`)
+  and reinstall.
+  - The demo baseline is re-recorded on the Mini with E2B-it: 145/145 PASS against it, max probability change 0.0000.
+    Against the E4B v0.6.1 baseline, 26 entries changed (8 are evals score values). Worse: the photo demo's place is
+    "on a sidewalk" for the front-door and mailbox photos, the crushed-truck photo and video are no longer "damaged", and
+    two voice clips are now urgent. Also changed: the routing summary goes "small", the ambiguous gate case is "replace"
+    instead of "deny", inbox emails 7 and 8, one Japanese bulk row, the Control demo's no-hint robot 3, and the PR
+    labeler's blast radius on two examples.
 - **D1A pinned to `eb0b99b4`** (d1a main, with d1a#275 and d1a#276): the model server answers OpenAI chat with an
   unmerged chat build (the adapter off for chat, on for decisions) and serves embeddings from a GGUF model. `demo.sh` and `demo.ps1` move with it.
 - **D1A pinned to `5f771e17`** (d1a 0.5.0, plus d1a#248 and d1a#251): `feedback void` withdraws one source's outcomes with a reason
