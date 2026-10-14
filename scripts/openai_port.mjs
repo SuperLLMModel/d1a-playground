@@ -4,6 +4,7 @@
 // No key, like LM Studio's server. Streams (chat with "stream": true) pass through as they come.
 //   node scripts/openai_port.mjs <listen host> <listen port> <model server URL, e.g. http://127.0.0.1:8009>
 import http from "node:http";
+import { pipeline } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 const ROUTES = new Set(["POST /v1/chat/completions", "POST /v1/embeddings", "GET /v1/models"]);
@@ -27,17 +28,21 @@ export function createProxy(upstream) {
     const up = http.request({ host: target.hostname, port: target.port, method: req.method, path: req.url, headers }, (r) => {
       res.writeHead(r.statusCode, r.headers);
       res.flushHeaders();
-      r.pipe(res);
+      pipeline(r, res, (err) => err && res.destroy());   // a model server that dies mid-stream ends the client's response too
     });
     up.on("error", () => (res.headersSent ? res.destroy() : error(res, 502, "the D1A model server is not answering")));
     res.on("close", () => up.destroy());   // the client left: stop reading a stream nobody will receive
     req.pipe(up);
   });
+  server.keepAliveTimeout = 75_000;   // as the model server's (d1a#42): pooled clients (n8n, httpx) reuse an idle socket that
+  server.headersTimeout = 80_000;     // Node's 5 s default would close under them; headersTimeout must exceed it
   return server;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [host, port, upstream] = process.argv.slice(2);
   if (!host || !port || !upstream) { console.error("usage: node scripts/openai_port.mjs <host> <port> <model server URL>"); process.exit(2); }
-  createProxy(upstream).listen(Number(port), host, () => console.log(`OpenAI routes on ${host}:${port} -> ${upstream}`));
+  const server = createProxy(upstream);
+  server.on("error", (e) => { console.error(`cannot listen on ${host}:${port}: ${e.message}`); process.exit(1); });   // launchd retries in 10 s
+  server.listen(Number(port), host, () => console.log(`OpenAI routes on ${host}:${port} -> ${upstream}`));
 }

@@ -54,3 +54,28 @@ test("a model server that is down is a 502 with an OpenAI error body", async (t)
   assert.equal(r.status, 502);
   assert.match((await r.json()).error.message, /not answering/);
 });
+
+test("an idle pooled connection is still open after 6 s, as the model server's own (d1a#42)", async (t) => {
+  const model = http.createServer((req, res) => { req.resume(); req.on("end", () => res.end("{}")); });
+  const upstream = await listen(model), proxy = createProxy(upstream), base = await listen(proxy);
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+  t.after(() => { agent.destroy(); proxy.close(); model.close(); });
+  const get = () => new Promise((ok, fail) => http.get(`${base}/v1/models`, { agent }, (r) => { const port = r.socket.localPort; r.resume(); r.on("end", () => ok(port)); }).on("error", fail));
+  const first = await get();
+  await new Promise((ok) => setTimeout(ok, 6000));
+  assert.equal(await get(), first, "the proxy closed the idle socket");
+});
+
+test("a model server that dies mid-stream ends the client's response instead of leaving it open", async (t) => {
+  const model = http.createServer((req, res) => {
+    req.resume();
+    req.on("end", () => { res.writeHead(200, { "content-type": "text/event-stream" }); res.write("data: first\n\n"); setTimeout(() => res.socket.destroy(), 100); });
+  });
+  const upstream = await listen(model), proxy = createProxy(upstream), base = await listen(proxy);
+  t.after(() => { proxy.close(); model.close(); });
+  const r = await fetch(`${base}/v1/chat/completions`, { method: "POST", body: "{}" });
+  const reader = r.body.getReader();
+  await reader.read();
+  const ended = await Promise.race([reader.read().then(() => "ended", () => "ended"), new Promise((ok) => setTimeout(() => ok("hung"), 3000))]);
+  assert.equal(ended, "ended");
+});

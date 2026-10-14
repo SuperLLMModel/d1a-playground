@@ -56,7 +56,7 @@ printf 'PORT=3999\nOPENAI_PORT=1234\nEMBED_GGUF=/models/nomic.gguf\n' > "$T/app/
 run openai FAIL_UV=   # OPENAI_PORT and EMBED_GGUF: the OpenAI routes on the LAN and the embedder (d1a#274)
 agent="$T/home/Library/LaunchAgents/io.github.jonpol01.d1a-openai.plist"
 [ "$(cat "$T/openai.status")" = 0 ] && [ -f "$agent" ] || fail openai "did not write the OpenAI port agent"
-tr -d ' \n' < "$agent" | grep -qF "openai_port.mjs</string><string>0.0.0.0</string><string>1234</string><string>http://127.0.0.1:8009</string>" || fail openai "the agent does not forward 0.0.0.0:1234 to the model server"
+tr -d ' \n' < "$agent" | grep -qF "openai_port.mjs</string><string>::</string><string>1234</string><string>http://127.0.0.1:8009</string>" || fail openai "the agent does not forward every address on 1234 to the model server"
 [ -n "$(last openai "bootstrap .*io.github.jonpol01.d1a-openai.plist")" ] || fail openai "did not start the OpenAI port"
 grep -A1 "<key>D1A_EMBED_GGUF</key>" "$T/home/Library/LaunchAgents/io.github.jonpol01.d1a-model.plist" | grep -qF "<string>/models/nomic.gguf</string>" || fail openai "the model server has no embedder"
 grep -q '^uv pip install .*d1a\[serve,embed\]' "$T/openai" || fail openai "did not install the embed extra"

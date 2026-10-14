@@ -21,7 +21,7 @@
 #   MEDIA=0 (1 = demos 10-11 too: the model server answers photos and voice with the same model, through Gemma 4's vision
 #   and audio encoders, ~1 GB more while loaded; MODEL_RUN must carry them, e.g. JohnP1/d1a-e4b-mlx-q8@v0.3)
 #   OPENAI_PORT= (e.g. 1234, LM Studio's port: the model server's OpenAI chat, embeddings and model list on OPENAI_HOST,
-#   0.0.0.0 by default, with no key, for apps that used LM Studio; MODEL_RUN must be an unmerged chat build, d1a docs/USAGE.md
+#   "::" by default: every IPv4 and IPv6 address, as LM Studio listened, with no key, for apps that used LM Studio; MODEL_RUN must be an unmerged chat build, d1a docs/USAGE.md
 #   "Chat with D1A". The System One routes stay on 127.0.0.1)
 #   EMBED_GGUF= (a GGUF embedding model, e.g. nomic-embed-text-v1.5.Q4_K_M.gguf, for POST /v1/embeddings)
 set -euo pipefail
@@ -54,7 +54,7 @@ load_env() {
   PYTORCH_MPS_LOW_WATERMARK_RATIO="${PYTORCH_MPS_LOW_WATERMARK_RATIO:-0.6}"
   KEV_PREFIX_CACHE="${KEV_PREFIX_CACHE:-4}"; KEV_PREFIX_MAX_TOKENS="${KEV_PREFIX_MAX_TOKENS:-65536}"
   MEDIA="${MEDIA:-0}"; IDLE_UNLOAD="${IDLE_UNLOAD:-600}"
-  OPENAI_PORT="${OPENAI_PORT:-}"; OPENAI_HOST="${OPENAI_HOST:-0.0.0.0}"; EMBED_GGUF="${EMBED_GGUF:-}"
+  OPENAI_PORT="${OPENAI_PORT:-}"; OPENAI_HOST="${OPENAI_HOST:-::}"; EMBED_GGUF="${EMBED_GGUF:-}"
   FEEDBACK_LOG="${FEEDBACK_LOG:-}"; OUTCOME_CALIBRATOR="${OUTCOME_CALIBRATOR:-}"; LABEL_OUTCOMES="${LABEL_OUTCOMES:-0}"
   LEARNING="$STATE/learning.json"; TRAINED_DIR="$STATE/trained"   # the self-learning settings and the trained manifests (d1a#233)
 }
