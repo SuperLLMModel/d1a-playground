@@ -4,6 +4,7 @@
 //
 //   node scripts/openai_smoke.mjs http://127.0.0.1:1234                                  # the OpenAI port only
 //   node scripts/openai_smoke.mjs http://127.0.0.1:1234 --decide http://127.0.0.1:8009   # and decisions (mini.sh smoke)
+//   ... --wait-limit-ms <ms>  how long a decision may wait behind a running chat (30000)
 //   ... --embed-ref <file>   also compare embeddings with reference vectors ({"texts": [...], "vectors": [...]}, e.g. LM
 //                            Studio's for the same GGUF): every cosine must be at least 0.999
 //
@@ -35,7 +36,7 @@ async function post(url, body, headers = {}) {
   return { status: r.status, type: r.headers.get("content-type") || "", text, json };
 }
 
-export async function run(base, { decide, embedRef, log = console.log } = {}) {
+export async function run(base, { decide, embedRef, waitLimitMs = 30000, log = console.log } = {}) {
   const results = [], chat = { model: "d1a-chat" };
   const check = async (name, fn) => {
     const t0 = performance.now();
@@ -109,6 +110,15 @@ export async function run(base, { decide, embedRef, log = console.log } = {}) {
     must(/tokyo/i.test(j.capital || ""), `capital ${JSON.stringify(j.capital)}`);
     return JSON.stringify(j);
   });
+  await check("tool call cut off by max_tokens", async () => {   // d1a#278: no half-written Gemma markup in the text
+    const write = [{ type: "function", function: { name: "write_file", description: "Write a file", parameters: { type: "object",
+      properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } } }];
+    const c = await complete({ messages: [{ role: "user", content: "Save a file /tmp/notes.md containing a 200-word essay about tea in Japan." }], tools: write, max_tokens: 20 });
+    const text = c.message.content || "";
+    must(!text.includes("<|tool_call>") && !text.includes("call:") && !(c.message.tool_calls || []).length && c.finish_reason === "length",
+      `finish ${c.finish_reason}, ${JSON.stringify(c.message)}`.slice(0, 300));
+    return `finish length, no markup, no partial call`;
+  });
   const SENTENCES = ["The cat sat on the mat.", "A cat is sitting on a mat.", "Quarterly revenue grew by eight percent."];
   await check("embeddings", async () => {
     const get = async () => {
@@ -122,6 +132,27 @@ export async function run(base, { decide, embedRef, log = console.log } = {}) {
     const near = cos(a[0], a[1]), far = cos(a[0], a[2]);
     must(near > far + 0.1, `similar ${near.toFixed(3)} vs unrelated ${far.toFixed(3)}`);
     return `${a[0].length}-d, unit length, repeatable; similar ${near.toFixed(3)} > unrelated ${far.toFixed(3)}`;
+  });
+  await check("embeddings in base64 (Node SDK, n8n)", async () => {   // d1a#282: the openai Node SDK always asks for base64
+    const ask = async (encoding_format) => {
+      const r = await post(`${base}/v1/embeddings`, { model: embedId, input: SENTENCES, encoding_format });
+      must(r.status === 200, `HTTP ${r.status}`); return r.json.data.map((d) => d.embedding);
+    };
+    const [b64, flt] = [await ask("base64"), await ask("float")];
+    must(b64.every((e) => typeof e === "string"), `base64 asked, got ${typeof b64[0]}`);
+    const vecs = b64.map((e) => { const buf = Buffer.from(e, "base64"); return Array.from({ length: buf.length / 4 }, (_, i) => buf.readFloatLE(4 * i)); });
+    must(vecs.every((v, i) => v.length === flt[i].length && cos(v, flt[i]) > 0.99999), `dims ${vecs.map((v) => v.length)} vs ${flt.map((v) => v.length)}`);
+    return `${vecs[0].length}-d, equal to the float vectors`;
+  });
+  if (decide) await check("a decision during a chat still answers", async () => {   // one model thread: it waits for the chat, never forever
+    const chatting = complete({ messages: [{ role: "user", content: "Write a short paragraph about tea in Japan." }], max_tokens: 120 });
+    await new Promise((ok) => setTimeout(ok, 300));
+    const t0 = performance.now();
+    const r = await Promise.race([post(`${decide}/v1/systemone`, DECISION, NO_LOG), new Promise((ok) => setTimeout(() => ok(null), waitLimitMs))]);
+    const waited = Math.round(performance.now() - t0);
+    await chatting.catch(() => {});
+    must(r && r.status === 200 && r.json?.answers?.sev?.choice, r ? `HTTP ${r.status}` : `no answer within ${waitLimitMs} ms`);
+    return `answered after ${waited} ms (waits for the running chat)`;
   });
   if (embedRef) await check("embeddings match the reference", async () => {
     const ref = JSON.parse(readFileSync(embedRef, "utf-8"));
@@ -149,6 +180,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
   const args = process.argv.slice(2), opt = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined; };
   const base = args[0];
   if (!base || base.startsWith("--")) { console.error("usage: node scripts/openai_smoke.mjs <OpenAI port URL> [--decide <model server URL>] [--embed-ref <file>]"); process.exit(2); }
-  const { pass } = await run(base.replace(/\/$/, ""), { decide: opt("--decide"), embedRef: opt("--embed-ref") });
+  const { pass } = await run(base.replace(/\/$/, ""), { decide: opt("--decide"), embedRef: opt("--embed-ref"), waitLimitMs: Number(opt("--wait-limit-ms") || 30000) });
   process.exit(pass ? 0 : 1);
 }
