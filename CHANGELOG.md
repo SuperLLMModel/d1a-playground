@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **The smoke test checks the OpenAI port** (`scripts/openai_smoke.mjs`, jonpol01/d1a#274). With `OPENAI_PORT` set, it
+  sends real requests through the port and judges the answers: chat, a stop string, streaming, a tool call, JSON mode and
+  embeddings. It also checks that the System One and feedback routes are closed there, and that a decision is identical
+  before and after the chats. `EMBED_REF` adds a match against reference embeddings (cosine at least 0.999). CI checks
+  that it fails each kind of broken server. `openai_port.mjs` and `openai_smoke.mjs` also run when started through a
+  symlink (macOS `/tmp`), where they used to exit 0 without running.
 - **D1A on LM Studio's port.** `OPENAI_PORT=1234` (with `OPENAI_HOST`, `::` by default: IPv4 and IPv6) adds the LaunchAgent
   `io.github.jonpol01.d1a-openai` (`scripts/openai_port.mjs`), which serves only the model server's OpenAI chat,
   embeddings and model list on the LAN, with no key, so apps that used LM Studio there reach D1A unchanged
@@ -28,6 +34,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **D1A pinned to `24e0c3d4`** (d1a#277): the GGUF embedder runs on the GPU, so its vectors are LM Studio's for the same
+  file (cosine 1.00000, from about 0.99 on the CPU). `demo.sh` and `demo.ps1` move with it.
 - **The Mac mini serves D1A-E2B-it v0.6, one model for decisions and OpenAI chat** (jonpol01/d1a#274): an unmerged 8-bit
   build of `JohnP1/d1a-e2b-it@v0.6` with the media encoders, built locally (not published), with `OPENAI_PORT=1234` and
   `EMBED_GGUF` (nomic-embed-text-v1.5). LM Studio is off. mem0, n8n and the Hermes fallbacks reach D1A on port 1234. John

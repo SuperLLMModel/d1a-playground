@@ -24,6 +24,8 @@
 #   "::" by default: every IPv4 and IPv6 address, as LM Studio listened, with no key, for apps that used LM Studio; MODEL_RUN must be an unmerged chat build, d1a docs/USAGE.md
 #   "Chat with D1A". The System One routes stay on 127.0.0.1)
 #   EMBED_GGUF= (a GGUF embedding model, e.g. nomic-embed-text-v1.5.Q4_K_M.gguf, for POST /v1/embeddings)
+#   EMBED_REF= (reference vectors, {"texts": [...], "vectors": [...]}, e.g. LM Studio's for the same GGUF: the smoke test's
+#   OpenAI check then requires the served embeddings to match them, cosine >= 0.999)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -40,7 +42,7 @@ PROMOTE_LABEL="io.github.jonpol01.d1a-promote"     # LABEL_OUTCOMES=1 and OUTCOM
 # the default model: the MLX 8-bit build on Apple Silicon (4.2 GB, parity-checked), the PyTorch checkpoint elsewhere
 if [ "$(uname -sm)" = "Darwin arm64" ]; then DEFAULT_MODEL_RUN="JohnP1/d1a-e2b-mlx-q8"; else DEFAULT_MODEL_RUN="JohnP1/d1a-e2b"; fi
 D1A_REPO="https://github.com/jonpol01/d1a"
-D1A_SHA="eb0b99b4e22175b9bf301e49a45dadc12276844f"   # the D1A model server this playground is tested against
+D1A_SHA="24e0c3d4b9599046a35fd847bc323c18fddf3783"   # the D1A model server this playground is tested against
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 say() { printf '\033[1m[mini]\033[0m %s\n' "$*"; }
@@ -54,7 +56,7 @@ load_env() {
   PYTORCH_MPS_LOW_WATERMARK_RATIO="${PYTORCH_MPS_LOW_WATERMARK_RATIO:-0.6}"
   KEV_PREFIX_CACHE="${KEV_PREFIX_CACHE:-4}"; KEV_PREFIX_MAX_TOKENS="${KEV_PREFIX_MAX_TOKENS:-65536}"
   MEDIA="${MEDIA:-0}"; IDLE_UNLOAD="${IDLE_UNLOAD:-600}"
-  OPENAI_PORT="${OPENAI_PORT:-}"; OPENAI_HOST="${OPENAI_HOST:-::}"; EMBED_GGUF="${EMBED_GGUF:-}"
+  OPENAI_PORT="${OPENAI_PORT:-}"; OPENAI_HOST="${OPENAI_HOST:-::}"; EMBED_GGUF="${EMBED_GGUF:-}"; EMBED_REF="${EMBED_REF:-}"
   FEEDBACK_LOG="${FEEDBACK_LOG:-}"; OUTCOME_CALIBRATOR="${OUTCOME_CALIBRATOR:-}"; LABEL_OUTCOMES="${LABEL_OUTCOMES:-0}"
   LEARNING="$STATE/learning.json"; TRAINED_DIR="$STATE/trained"   # the self-learning settings and the trained manifests (d1a#233)
 }
@@ -90,6 +92,7 @@ LABEL_OUTCOMES=$LABEL_OUTCOMES
 OPENAI_PORT=$OPENAI_PORT
 OPENAI_HOST=$OPENAI_HOST
 EMBED_GGUF=$EMBED_GGUF
+EMBED_REF=$EMBED_REF
 EOF
 }
 
@@ -297,6 +300,13 @@ smoke() {   # every demo's examples through the web app, checked against scripts
   until curl -fsS -m 5 -o /dev/null "$url/kev/v1/models"; do n=$((n + 1)); [ $n -gt 120 ] && die "the web app or the model server did not come up; see $LOGS"; sleep 5; done
   local media=""; [ "$MEDIA" = 1 ] || media="--no-media"   # a string, not an array: bash 3.2 under set -u calls an empty array unbound
   node "$ROOT/scripts/demo_smoke.mjs" "$url" $media || die "demo smoke test FAILED: a demo no longer answers, or answers differently (scripts/demo_smoke.mjs)"
+  [ -n "$OPENAI_PORT" ] || return 0
+  # the OpenAI port as apps see it (chat, streaming, tools, JSON, embeddings, the closed System One routes), and decisions
+  # unchanged after the chats (scripts/openai_smoke.mjs)
+  local h="$OPENAI_HOST" ref=""; case "$h" in 0.0.0.0|::) h=127.0.0.1 ;; *:*) h="[$h]" ;; esac
+  [ -z "$EMBED_REF" ] || ref="--embed-ref $EMBED_REF"
+  node "$ROOT/scripts/openai_smoke.mjs" "http://$h:$OPENAI_PORT" --decide "http://127.0.0.1:$KEV_PORT" $ref \
+    || die "OpenAI smoke test FAILED: chat, embeddings or decisions on the OpenAI port (scripts/openai_smoke.mjs)"
 }
 
 stop() {

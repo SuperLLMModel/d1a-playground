@@ -3,6 +3,7 @@
 // pass; everything else, the System One routes and /v1/feedback included, stays on the model server's 127.0.0.1 port.
 // No key, like LM Studio's server. Streams (chat with "stream": true) pass through as they come.
 //   node scripts/openai_port.mjs <listen host> <listen port> <model server URL, e.g. http://127.0.0.1:8009>
+import { realpathSync } from "node:fs";
 import http from "node:http";
 import { pipeline } from "node:stream";
 import { pathToFileURL } from "node:url";
@@ -39,7 +40,7 @@ export function createProxy(upstream) {
   return server;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {   // realpath: run through a symlink (macOS /tmp) it is still the main module
   const [host, port, upstream] = process.argv.slice(2);
   if (!host || !port || !upstream) { console.error("usage: node scripts/openai_port.mjs <host> <port> <model server URL>"); process.exit(2); }
   const server = createProxy(upstream);
