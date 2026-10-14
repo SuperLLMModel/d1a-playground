@@ -18,7 +18,7 @@ set -euo pipefail
 
 # The D1A model server this demo runs, pinned to a commit so every friend gets the same server (mini.sh pins the same one).
 D1A_REPO="https://github.com/jonpol01/d1a"
-D1A_SHA="5f771e17fd33de36946c5efc9e945c9f12cfa035"
+D1A_SHA="eb0b99b4e22175b9bf301e49a45dadc12276844f"
 APPLE_SILICON=0; [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] && APPLE_SILICON=1
 # the 8-bit MLX build on Apple Silicon (4.2 GB, no base download), the PyTorch checkpoint elsewhere
 if [ "$APPLE_SILICON" = 1 ]; then MODEL_RUN="${MODEL_RUN:-JohnP1/d1a-e2b-mlx-q8}"; else MODEL_RUN="${MODEL_RUN:-JohnP1/d1a-e2b}"; fi
