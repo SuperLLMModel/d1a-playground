@@ -34,6 +34,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **D1A pinned to `b4b36f41`** (d1a#279): an OpenAI chat answer cut off by `max_tokens` inside a tool call no longer
+  returns the half-written Gemma 4 markup as text; it keeps the text before it, with `finish_reason` `"length"`.
+  `demo.sh` and `demo.ps1` move with it.
 - **D1A pinned to `24e0c3d4`** (d1a#277): the GGUF embedder runs on the GPU, so its vectors are LM Studio's for the same
   file (cosine 1.00000, from about 0.99 on the CPU). `demo.sh` and `demo.ps1` move with it.
 - **The Mac mini serves D1A-E2B-it v0.6, one model for decisions and OpenAI chat** (jonpol01/d1a#274): an unmerged 8-bit
