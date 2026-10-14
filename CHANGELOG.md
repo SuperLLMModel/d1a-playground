@@ -72,6 +72,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`mini.sh start` survives launchd's "Bootstrap failed: 5".** Right after a `stop`, launchd refused to load an agent
+  again while its bootout was still finishing. Under `set -e` the start ended there and every agent stayed down: on the
+  Mac mini on 2026-10-15, after an evaluation window, the restart failed until it was run again by hand five minutes
+  later. `start` now tries each agent up to six times, five seconds apart, and fails loudly if launchd never accepts.
 - **No more 500s while the model server starts** (jonpol01/d1a#42). `mini.sh` now starts the model server first and
   waits, for up to 2 minutes, until it answers `/v1/models` before starting the web app. Until then the web app (ready
   in about 50 ms) proxied the page's first models poll to a closed port and returned a 500 (`ECONNREFUSED`): once per

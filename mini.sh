@@ -284,11 +284,20 @@ wait_for_model() {   # the web app is ready in ~50 ms, the model server's port o
   done
 }
 
+bootstrap() {   # launchd refuses a bootstrap ("Bootstrap failed: 5: Input/output error") while the bootout of the same label is
+  # still finishing: right after `stop` it did, and under set -e the start ended there with every agent down (2026-10-15)
+  local n=0
+  until launchctl bootstrap "$1" "$2"; do
+    n=$((n + 1)); [ $n -ge 6 ] && return 1
+    say "launchd is not ready for ${2##*/} yet; trying again in 5 s"; sleep 5
+  done
+}
+
 start() {
   local d; d="$(domain)"
   for l in $(labels); do
     launchctl bootout "$d/$l" 2>/dev/null || true
-    launchctl bootstrap "$d" "$AGENTS/$l.plist"
+    bootstrap "$d" "$AGENTS/$l.plist" || die "launchd refused $l six times; see launchctl print $d/$l"
     [ "$l" = "$PROMOTE_LABEL" ] && continue   # a calendar job: it runs at 04:00, not at start
     launchctl kickstart "$d/$l"   # a bootstrap right after a bootout can leave the agent loaded but not running
     if [ "$l" = "$MODEL_LABEL" ]; then wait_for_model; fi

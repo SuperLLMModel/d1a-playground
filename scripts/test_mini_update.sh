@@ -9,9 +9,15 @@ mkdir -p "$T/app/.demo" "$T/home"; cp "$ROOT/mini.sh" "$T/app/"; printf 'PORT=39
 # stand-ins for what mini.sh runs, as exported functions so they win over the Homebrew PATH it prepends; they log their calls
 uv() { echo "uv $* cache=$(printenv UV_CACHE_DIR || echo unset)" >> "$CALLS"; [ "$1" != pip ] || [ -z "${FAIL_UV:-}" ]; }   # printenv: what uv itself would see
 npm() { echo "npm $*" >> "$CALLS"; [ "$1" != ci ] || [ -z "${FAIL_NPM:-}" ]; }
-launchctl() { echo "launchctl $*" >> "$CALLS"; }
+launchctl() {   # FAIL_BOOTSTRAP=n: the first n bootstraps fail as launchd does right after a bootout (exit 5)
+  echo "launchctl $*" >> "$CALLS"
+  [ "$1" = bootstrap ] && [ -n "${FAIL_BOOTSTRAP:-}" ] || return 0
+  local n; n=$(cat "$CALLS.bs" 2>/dev/null || echo 0); echo $((n + 1)) > "$CALLS.bs"
+  [ "$n" -ge "$FAIL_BOOTSTRAP" ] || { echo "Bootstrap failed: 5: Input/output error" >&2; return 5; }
+}
+sleep() { :; }
 node() { :; }; curl() { :; }; plutil() { :; }
-export -f uv npm launchctl node curl plutil
+export -f uv npm launchctl node curl plutil sleep
 run() {   # case name, then its environment: the calls go to $T/<name>, mini.sh's output and exit status next to them
   CALLS="$T/$1"; export CALLS; : > "$CALLS"; shift
   local status=0; env -u UV_CACHE_DIR "$@" HOME="$T/home" /bin/bash "$T/app/mini.sh" reinstall > "$CALLS.out" 2>&1 || status=$?
@@ -64,6 +70,14 @@ printf 'PORT=3999\n' > "$T/app/.demo/mini.env"
 run openai_off FAIL_UV=   # without OPENAI_PORT the agent goes, and nothing listens on the LAN
 [ ! -f "$agent" ] && [ -n "$(last openai_off "bootout .*/io.github.jonpol01.d1a-openai$")" ] || fail openai_off "left the OpenAI port agent"
 ! grep -q 'embed\]' "$T/openai_off" || fail openai_off "installed the embed extra without EMBED_GGUF"
+
+run bootstrap FAIL_UV= FAIL_BOOTSTRAP=2   # launchd refuses the first two bootstraps: start waits and tries again (2026-10-15)
+[ "$(cat "$T/bootstrap.status")" = 0 ] || fail bootstrap "a refused bootstrap ended the start"
+for label in io.github.jonpol01.d1a-model io.github.jonpol01.d1a-web; do
+  [ -n "$(last bootstrap "kickstart .*$label$")" ] || fail bootstrap "$label never started after launchd refused a bootstrap"
+done
+run bootstrap_never FAIL_UV= FAIL_BOOTSTRAP=99   # launchd never accepts: the start fails loudly, not silently
+[ "$(cat "$T/bootstrap_never.status")" != 0 ] && grep -q "refused" "$T/bootstrap_never.out" || fail bootstrap_never "a start launchd never accepted exited 0"
 
 run install FAIL_UV=1
 [ -n "$(last install "^uv pip install")" ] || fail install "never reached the install"
