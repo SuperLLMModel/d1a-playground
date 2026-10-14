@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Three more live checks in the smoke test** (`scripts/openai_smoke.mjs`):
+  - a tool call cut off by `max_tokens` must leave no Gemma markup in the text (d1a#278);
+  - embeddings asked for in base64, as the openai Node SDK and n8n always do, must decode to the float vectors (d1a#282);
+  - with `--decide`, a decision sent while a chat runs must still answer within `--wait-limit-ms` (30 s).
+
+  CI shows each one fails a stand-in broken that way.
 - **The smoke test checks the OpenAI port** (`scripts/openai_smoke.mjs`, jonpol01/d1a#274). With `OPENAI_PORT` set, it
   sends real requests through the port and judges the answers: chat, a stop string, streaming, a tool call, JSON mode and
   embeddings. It also checks that the System One and feedback routes are closed there, and that a decision is identical
@@ -34,6 +40,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **D1A pinned to `9b7bd8b6`** (d1a#281, d1a#283):
+  - `/v1/models` lists `d1a-chat` while an idle server has unloaded the model, so n8n's model dropdown finds it;
+  - `/v1/embeddings` honours `encoding_format: "base64"`. The openai Node SDK (n8n) always asks for it, and used to
+    decode D1A's float lists into 192 numbers instead of 768.
+
+  `demo.sh` and `demo.ps1` move with it.
 - **D1A pinned to `b4b36f41`** (d1a#279): an OpenAI chat answer cut off by `max_tokens` inside a tool call no longer
   returns the half-written Gemma 4 markup as text; it keeps the text before it, with `finish_reason` `"length"`.
   `demo.sh` and `demo.ps1` move with it.
