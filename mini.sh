@@ -20,6 +20,10 @@
 #   on the next one; 0 keeps it loaded)
 #   MEDIA=0 (1 = demos 10-11 too: the model server answers photos and voice with the same model, through Gemma 4's vision
 #   and audio encoders, ~1 GB more while loaded; MODEL_RUN must carry them, e.g. JohnP1/d1a-e4b-mlx-q8@v0.3)
+#   OPENAI_PORT= (e.g. 1234, LM Studio's port: the model server's OpenAI chat, embeddings and model list on OPENAI_HOST,
+#   0.0.0.0 by default, with no key, for apps that used LM Studio; MODEL_RUN must be an unmerged chat build, d1a docs/USAGE.md
+#   "Chat with D1A". The System One routes stay on 127.0.0.1)
+#   EMBED_GGUF= (a GGUF embedding model, e.g. nomic-embed-text-v1.5.Q4_K_M.gguf, for POST /v1/embeddings)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -30,12 +34,13 @@ LOGS="$HOME/Library/Logs"
 MODEL_LABEL="io.github.jonpol01.d1a-model"
 MEDIA_LABEL="io.github.jonpol01.d1a-media"   # the separate media server older versions ran; removed on install
 WEB_LABEL="io.github.jonpol01.d1a-web"
+OPENAI_LABEL="io.github.jonpol01.d1a-openai"       # OPENAI_PORT: scripts/openai_port.mjs, the OpenAI routes on the LAN (d1a#274)
 OUTCOMES_LABEL="io.github.jonpol01.d1a-outcomes"   # LABEL_OUTCOMES=1: scripts/pr_outcomes.py every 15 minutes
 PROMOTE_LABEL="io.github.jonpol01.d1a-promote"     # LABEL_OUTCOMES=1 and OUTCOME_CALIBRATOR: the self-learning tick every 15 minutes (d1a#233; the label of the 04:00 promote it replaces)
 # the default model: the MLX 8-bit build on Apple Silicon (4.2 GB, parity-checked), the PyTorch checkpoint elsewhere
 if [ "$(uname -sm)" = "Darwin arm64" ]; then DEFAULT_MODEL_RUN="JohnP1/d1a-e2b-mlx-q8"; else DEFAULT_MODEL_RUN="JohnP1/d1a-e2b"; fi
 D1A_REPO="https://github.com/jonpol01/d1a"
-D1A_SHA="5f771e17fd33de36946c5efc9e945c9f12cfa035"   # the D1A model server this playground is tested against
+D1A_SHA="eb0b99b4e22175b9bf301e49a45dadc12276844f"   # the D1A model server this playground is tested against
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 say() { printf '\033[1m[mini]\033[0m %s\n' "$*"; }
@@ -49,6 +54,7 @@ load_env() {
   PYTORCH_MPS_LOW_WATERMARK_RATIO="${PYTORCH_MPS_LOW_WATERMARK_RATIO:-0.6}"
   KEV_PREFIX_CACHE="${KEV_PREFIX_CACHE:-4}"; KEV_PREFIX_MAX_TOKENS="${KEV_PREFIX_MAX_TOKENS:-65536}"
   MEDIA="${MEDIA:-0}"; IDLE_UNLOAD="${IDLE_UNLOAD:-600}"
+  OPENAI_PORT="${OPENAI_PORT:-}"; OPENAI_HOST="${OPENAI_HOST:-0.0.0.0}"; EMBED_GGUF="${EMBED_GGUF:-}"
   FEEDBACK_LOG="${FEEDBACK_LOG:-}"; OUTCOME_CALIBRATOR="${OUTCOME_CALIBRATOR:-}"; LABEL_OUTCOMES="${LABEL_OUTCOMES:-0}"
   LEARNING="$STATE/learning.json"; TRAINED_DIR="$STATE/trained"   # the self-learning settings and the trained manifests (d1a#233)
 }
@@ -81,6 +87,9 @@ IDLE_UNLOAD=$IDLE_UNLOAD
 FEEDBACK_LOG=$FEEDBACK_LOG
 OUTCOME_CALIBRATOR=$OUTCOME_CALIBRATOR
 LABEL_OUTCOMES=$LABEL_OUTCOMES
+OPENAI_PORT=$OPENAI_PORT
+OPENAI_HOST=$OPENAI_HOST
+EMBED_GGUF=$EMBED_GGUF
 EOF
 }
 
@@ -94,6 +103,7 @@ install_server() {   # reinstall runs it before stop: a failed download or insta
   : "${UV_CACHE_DIR:=$STATE/uv-cache}"; export UV_CACHE_DIR
   command -v node >/dev/null || die "node is missing (brew install node)"
   local extras="serve"; [ "$MEDIA" = 1 ] && extras="serve,media"
+  [ -n "$EMBED_GGUF" ] && extras="$extras,embed"   # llama.cpp for the GGUF embedder
   say "model server: d1a[$extras] from $D1A_REPO@${D1A_SHA:0:7} into .demo/d1a-venv ($MODEL_RUN)"
   uv venv --quiet --allow-existing --python 3.12 "$STATE/d1a-venv"
   uv pip install --quiet --python "$STATE/d1a-venv/bin/python" --torch-backend auto "d1a[$extras] @ git+$D1A_REPO@$D1A_SHA"
@@ -146,6 +156,8 @@ write_agents() {
 "
   [ -n "$OUTCOME_CALIBRATOR" ] && ENV_XML+="    <key>D1A_OUTCOME_CALIBRATOR</key><string>$OUTCOME_CALIBRATOR</string>
 "
+  [ -n "$EMBED_GGUF" ] && ENV_XML+="    <key>D1A_EMBED_GGUF</key><string>$EMBED_GGUF</string>
+"
   plist "$MODEL_LABEL" "$STATE/d1a-venv/bin/python" -m d1a.serving.serve --run "$MODEL_RUN" --port "$KEV_PORT" --host 127.0.0.1 --idle-unload "$IDLE_UNLOAD" >"$AGENTS/$MODEL_LABEL.plist"
   launchctl bootout "$(domain)/$MEDIA_LABEL" 2>/dev/null || true; rm -f "$AGENTS/$MEDIA_LABEL.plist"   # photos and voice now go to the model server
   ENV_XML="    <key>PATH</key><string>$path</string>
@@ -164,6 +176,14 @@ write_agents() {
 "
   plist "$WEB_LABEL" "$(command -v node)" "$ROOT/node_modules/next/dist/bin/next" start -p "$PORT" -H "$HOST" >"$AGENTS/$WEB_LABEL.plist"
   plutil -lint "$AGENTS/$MODEL_LABEL.plist" "$AGENTS/$WEB_LABEL.plist" >/dev/null
+  if [ -n "$OPENAI_PORT" ]; then
+    ENV_XML="    <key>PATH</key><string>$path</string>
+"
+    plist "$OPENAI_LABEL" "$(command -v node)" "$ROOT/scripts/openai_port.mjs" "$OPENAI_HOST" "$OPENAI_PORT" "http://127.0.0.1:$KEV_PORT" >"$AGENTS/$OPENAI_LABEL.plist"
+    plutil -lint "$AGENTS/$OPENAI_LABEL.plist" >/dev/null
+  else
+    launchctl bootout "$(domain)/$OPENAI_LABEL" 2>/dev/null || true; rm -f "$AGENTS/$OPENAI_LABEL.plist"
+  fi
   if [ "$LABEL_OUTCOMES" = 1 ]; then
     [ -n "$FEEDBACK_LOG" ] || die "LABEL_OUTCOMES=1 needs FEEDBACK_LOG: the outcomes go to the model server's decision log"
     # the PR and issue labeler's outcomes (review bot and human label changes) posted to /v1/feedback; runs at load, then every
@@ -246,6 +266,7 @@ EOF
 
 labels() {   # the agents this machine runs, in start order
   echo "$MODEL_LABEL"; echo "$WEB_LABEL"
+  [ -f "$AGENTS/$OPENAI_LABEL.plist" ] && echo "$OPENAI_LABEL"
   [ -f "$AGENTS/$OUTCOMES_LABEL.plist" ] && echo "$OUTCOMES_LABEL"
   [ -f "$AGENTS/$PROMOTE_LABEL.plist" ] && echo "$PROMOTE_LABEL"
   return 0
@@ -280,7 +301,7 @@ smoke() {   # every demo's examples through the web app, checked against scripts
 
 stop() {
   local d; d="$(domain)"
-  for l in "$PROMOTE_LABEL" "$OUTCOMES_LABEL" "$WEB_LABEL" "$MEDIA_LABEL" "$MODEL_LABEL"; do launchctl bootout "$d/$l" 2>/dev/null && say "stopped $l" || say "$l was not loaded"; done
+  for l in "$PROMOTE_LABEL" "$OUTCOMES_LABEL" "$OPENAI_LABEL" "$WEB_LABEL" "$MEDIA_LABEL" "$MODEL_LABEL"; do launchctl bootout "$d/$l" 2>/dev/null && say "stopped $l" || say "$l was not loaded"; done
 }
 
 restart_after_failure() {   # the EXIT trap between reinstall's stop and start: a down model server also stops the PR labeler
@@ -299,6 +320,7 @@ status() {
   done
   curl -fsS -m 3 "http://127.0.0.1:$KEV_PORT/v1/models" >/dev/null && say "model server answers on :$KEV_PORT" || say "model server not answering on :$KEV_PORT (still loading?)"
   curl -fsS -m 3 "http://127.0.0.1:$KEV_PORT/v1/models" 2>/dev/null | grep -q '"loaded":true' && say "model in memory" || say "model not in memory (it loads on the next request)"
+  [ -z "$OPENAI_PORT" ] || { curl -fsS -m 3 -o /dev/null "http://127.0.0.1:$OPENAI_PORT/v1/models" && say "OpenAI routes answer on $OPENAI_HOST:$OPENAI_PORT" || say "OpenAI routes not answering on :$OPENAI_PORT"; }
   curl -fsS -m 5 -o /dev/null "http://127.0.0.1:$PORT$D1A_BASE_PATH" && say "web app answers on http://$HOST:$PORT$D1A_BASE_PATH" || say "web app not answering on :$PORT"
 }
 

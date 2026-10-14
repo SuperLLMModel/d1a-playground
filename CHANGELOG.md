@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **D1A on LM Studio's port.** `OPENAI_PORT=1234` (with `OPENAI_HOST`, 0.0.0.0 by default) adds the LaunchAgent
+  `io.github.jonpol01.d1a-openai` (`scripts/openai_port.mjs`), which serves only the model server's OpenAI chat,
+  embeddings and model list on the LAN, with no key, so apps that used LM Studio there reach D1A unchanged
+  (jonpol01/d1a#274). `EMBED_GGUF` gives the model server its embedding model. Both are off unless set.
 - **The routing demo names its use case.** Its requests, in the UI and in the demo smoke test, send
   `"use_case": "routing"` (D1A jonpol01/d1a#214). A D1A model with a routing temperature (`use_case_temperatures` in
   `/v1/models`) answers them at that temperature, and the choice never moves. A model without one, or a D1A server older
@@ -24,6 +28,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **D1A pinned to `eb0b99b4`** (d1a main, with d1a#275 and d1a#276): the model server answers OpenAI chat with an
+  unmerged chat build (the adapter off for chat, on for decisions) and serves embeddings from a GGUF model. `demo.sh` and `demo.ps1` move with it.
 - **D1A pinned to `5f771e17`** (d1a 0.5.0, plus d1a#248 and d1a#251): `feedback void` withdraws one source's outcomes with a reason
   without rewriting the log, and `outcomes.sources` can name sources per question. After this deploy, the 40 PR-author
   "human" outcomes are voided, and the review bot's severity becomes monitoring-only
