@@ -144,7 +144,7 @@ export async function run(base, { decide, embedRef, waitLimitMs = 30000, log = c
     must(vecs.every((v, i) => v.length === flt[i].length && cos(v, flt[i]) > 0.99999), `dims ${vecs.map((v) => v.length)} vs ${flt.map((v) => v.length)}`);
     return `${vecs[0].length}-d, equal to the float vectors`;
   });
-  if (decide) await check("a decision during a chat still answers", async () => {   // one model thread: it waits for the chat, never forever
+  if (decide) await check("a decision during a chat still answers", async () => {   // one model thread: answered between the chat's tokens (d1a#289) or after it, never forever, and never different
     const chatting = complete({ messages: [{ role: "user", content: "Write a short paragraph about tea in Japan." }], max_tokens: 120 });
     await new Promise((ok) => setTimeout(ok, 300));
     const t0 = performance.now();
@@ -152,7 +152,8 @@ export async function run(base, { decide, embedRef, waitLimitMs = 30000, log = c
     const waited = Math.round(performance.now() - t0);
     await chatting.catch(() => {});
     must(r && r.status === 200 && r.json?.answers?.sev?.choice, r ? `HTTP ${r.status}` : `no answer within ${waitLimitMs} ms`);
-    return `answered after ${waited} ms (waits for the running chat)`;
+    must(!before || JSON.stringify(r.json.answers) === JSON.stringify(before), `before ${JSON.stringify(before)}, during the chat ${JSON.stringify(r.json.answers)}`);
+    return `answered after ${waited} ms, identical to the decision before the chats`;
   });
   if (embedRef) await check("embeddings match the reference", async () => {
     const ref = JSON.parse(readFileSync(embedRef, "utf-8"));

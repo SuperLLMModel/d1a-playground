@@ -32,7 +32,8 @@ function standIn(brk = "") {
       if (path.startsWith("/v1/systemone") || path === "/v1/feedback") {
         if (req.headers["x-test-decide"] || brk === "systemone-open") {
           decisions++;
-          const answers = brk === "decision-moves" && decisions > 1 ? { ...ANSWERS, security: { type: "noul", noul: 0.5 } } : ANSWERS;
+          const moved = brk === "decision-moves" && decisions > 1 || brk === "decision-moves-mid-chat" && decisions === 2;   // 1: before the chats, 2: during one, 3: after
+          const answers = moved ? { ...ANSWERS, security: { type: "noul", noul: 0.5 } } : ANSWERS;
           if (brk === "decision-hangs" && decisions > 1) return setTimeout(() => json(200, { answers }), 1500);
           return json(200, { answers });
         }
@@ -92,6 +93,7 @@ for (const [brk, name] of [
   ["cutoff-markup", "tool call cut off by max_tokens"],
   ["embed-b64-ignored", "embeddings in base64 (Node SDK, n8n)"],
   ["decision-hangs", "a decision during a chat still answers"],
+  ["decision-moves-mid-chat", "a decision during a chat still answers"],
 ]) test(`${brk} fails "${name}"`, async () => {
   const { pass, failed } = await check(brk);
   assert.equal(pass, false);
