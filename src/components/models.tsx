@@ -243,7 +243,7 @@ const EN = {
   s5body: "Each model ships in several formats. PyTorch is the adapter and head on the Hub trunk (any GPU or CPU); MLX runs on a Mac's GPU, with the photo, voice and video encoders; Core ML runs on the Apple Neural Engine or GPU (text, up to 512 tokens).",
   colModel: "model", colPt: "PyTorch", colMlx8: "MLX 8-bit", colMlx4: "MLX 4-bit", colCm8: "Core ML int8", colCm4: "Core ML int4",
   builds: [
-    ["D1A-E4B-it v0.6", "adapter", "6.1 + 0.9 GB", "3.9 + 0.9 GB", "converting", "converting"],
+    ["D1A-E4B-it v0.6", "adapter", "6.1 + 0.9 GB", "3.9 + 0.9 GB", "skipped", "4.4 GB"],
     ["D1A-E4B v0.6.1", "adapter", "6 + 1 GB", "—", "preview", "—"],
     ["D1A-E2B-it v0.6", "adapter", "3.5 + 0.9 GB", "2.5 + 0.9 GB", "3.5 GB", "2.6 GB"],
     ["D1A-E2B v0.6.1", "adapter", "3.5 + 0.9 GB", "—", "yes", "—"],
@@ -306,7 +306,7 @@ const JA: Text = {
   s5body: "各モデルは複数の形式で配布しています。PyTorch は Hub のトランクに載せるアダプターとヘッド（GPU・CPU どちらでも）。MLX は Mac の GPU で動き、写真・音声・動画のエンコーダーも含みます。Core ML は Apple Neural Engine または GPU で動きます（テキストのみ、512 トークンまで）。",
   colModel: "モデル", colPt: "PyTorch", colMlx8: "MLX 8 ビット", colMlx4: "MLX 4 ビット", colCm8: "Core ML int8", colCm4: "Core ML int4",
   builds: [
-    ["D1A-E4B-it v0.6", "アダプター", "6.1 + 0.9 GB", "3.9 + 0.9 GB", "変換中", "変換中"],
+    ["D1A-E4B-it v0.6", "アダプター", "6.1 + 0.9 GB", "3.9 + 0.9 GB", "見送り", "4.4 GB"],
     ["D1A-E4B v0.6.1", "アダプター", "6 + 1 GB", "—", "プレビュー", "—"],
     ["D1A-E2B-it v0.6", "アダプター", "3.5 + 0.9 GB", "2.5 + 0.9 GB", "3.5 GB", "2.6 GB"],
     ["D1A-E2B v0.6.1", "アダプター", "3.5 + 0.9 GB", "—", "あり", "—"],
