@@ -159,6 +159,9 @@ write_agents() {
 "
   [ -n "$OUTCOME_CALIBRATOR" ] && ENV_XML+="    <key>D1A_OUTCOME_CALIBRATOR</key><string>$OUTCOME_CALIBRATOR</string>
 "
+  # the learned flags and decode rules in the self-learning settings (d1a#237, #252, #296), re-read when the file changes
+  [ "$LABEL_OUTCOMES" = 1 ] && [ -n "$OUTCOME_CALIBRATOR" ] && ENV_XML+="    <key>D1A_LEARNING</key><string>$LEARNING</string>
+"
   [ -n "$EMBED_GGUF" ] && ENV_XML+="    <key>D1A_EMBED_GGUF</key><string>$EMBED_GGUF</string>
 "
   plist "$MODEL_LABEL" "$STATE/d1a-venv/bin/python" -m d1a.serving.serve --run "$MODEL_RUN" --port "$KEV_PORT" --host 127.0.0.1 --idle-unload "$IDLE_UNLOAD" >"$AGENTS/$MODEL_LABEL.plist"

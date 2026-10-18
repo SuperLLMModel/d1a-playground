@@ -52,6 +52,7 @@ grep -A1 "<string>--server</string>" "$agent" | grep -qF "<string>http://127.0.0
 grep -A1 "<string>--trained-dir</string>" "$agent" | grep -qF "<string>$T/app/.demo/trained</string>" || fail promote "the tick has no trained manifests folder"
 grep -A1 "<key>D1A_LEARNING</key>" "$agent" | grep -qF "<string>$T/app/.demo/learning.json</string>" || fail promote "the tick does not read the settings file"
 grep -q "StartInterval" "$agent" && ! grep -q "StartCalendarInterval" "$agent" || fail promote "the tick is not every 15 minutes"
+grep -A1 "<key>D1A_LEARNING</key>" "$T/home/Library/LaunchAgents/io.github.jonpol01.d1a-model.plist" | grep -qF "<string>$T/app/.demo/learning.json</string>" || fail promote "the model server does not read the settings file (its learned flags and rules)"
 grep -qF "config init --file $T/app/.demo/learning.json" "$T/promote" || fail promote "did not create the settings file"
 grep -qF 'promotion.questions=["type","blast","sev"]' "$T/promote" || fail promote "did not set the questions that learn"
 run promote2 FAIL_UV=   # a reinstall never overwrites John's settings
